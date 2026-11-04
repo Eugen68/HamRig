@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Authors>Eugen Trifu, YO9VA</Authors>
+    <Copyright>Copyright (c) 2026 Eugen Trifu, YO9VA</Copyright>
+  </PropertyGroup>
+</Project>

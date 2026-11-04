@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>HamRig</RootNamespace>
+    <PackageId>HamRig</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Radio (CAT) control for amateur radio apps: one interface (frequency, mode, PTT, change events) with a direct Yaesu CAT driver (FTX-1 and other recent Yaesu rigs) and an OmniRig driver.</Description>
+    <PackageTags>ham;amateur-radio;cat;yaesu;ftx-1;omnirig;rig-control</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/Eugen68/HamRig</RepositoryUrl>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <InternalsVisibleTo Include="HamRig.Tests" />
+  </ItemGroup>
+
+</Project>
