@@ -27,16 +27,21 @@ public static class RigMath
         };
     }
 
+    /// <summary>Modul RTTY al statiei (FSK): RTTY-L sau RTTY-U.</summary>
+    public static bool IsRtty(RigMode mode) => mode is RigMode.RttyL or RigMode.RttyU;
+
     /// <summary>
     /// QSY: noua frecventa VFO astfel incat semnalul auzit acum la <paramref name="fromAudioHz"/> sa
-    /// ajunga la <paramref name="toAudioHz"/> (ex. pe Mark-ul decodorului). Null daca modul nu e SSB/DATA/CW.
+    /// ajunga la <paramref name="toAudioHz"/> (ex. pe Mark-ul decodorului). In RTTY-L statia lucreaza
+    /// ca in LSB (ton audio mai jos = frecventa RF mai mare), in RTTY-U ca in USB - pentru QSY conteaza
+    /// doar diferenta, nu ce arata afisajul. Null daca modul nu e SSB/DATA/CW/RTTY.
     /// </summary>
     public static long? QsyDial(long dialHz, RigMode mode, double fromAudioHz, double toAudioHz)
     {
         if (dialHz <= 0) return null;
         double delta = fromAudioHz - toAudioHz;
-        if (IsUpperSideband(mode)) return (long)Math.Round(dialHz + delta);
-        if (IsLowerSideband(mode)) return (long)Math.Round(dialHz - delta);
+        if (IsUpperSideband(mode) || mode == RigMode.RttyU) return (long)Math.Round(dialHz + delta);
+        if (IsLowerSideband(mode) || mode == RigMode.RttyL) return (long)Math.Round(dialHz - delta);
         return null;
     }
 

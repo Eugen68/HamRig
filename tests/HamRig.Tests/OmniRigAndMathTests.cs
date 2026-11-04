@@ -94,6 +94,20 @@ public class RigMathTests
     }
 
     [Fact]
+    public void QsyInRtty()
+    {
+        // ambele statii pe 3.501.000; corespondentul cu 300 Hz mai sus apare in RTTY-L la 1825 Hz:
+        // statia urca 300 Hz si semnalul ajunge pe Mark 2125
+        Assert.Equal(3_501_300, RigMath.QsyDial(3_501_000, RigMode.RttyL, 1825, 2125));
+        // in RTTY-U, ca in USB: acelasi corespondent apare la 2425 Hz, statia urca tot 300 Hz
+        Assert.Equal(3_501_300, RigMath.QsyDial(3_501_000, RigMode.RttyU, 2425, 2125));
+        // deja pe Mark: nicio mutare
+        Assert.Equal(3_501_000, RigMath.QsyDial(3_501_000, RigMode.RttyL, 2125, 2125));
+        Assert.True(RigMath.IsRtty(RigMode.RttyL));
+        Assert.False(RigMath.IsRtty(RigMode.DataU));
+    }
+
+    [Fact]
     public void Afisare()
     {
         Assert.Equal("14.083.500", RigMath.FormatFrequency(14_083_500));
