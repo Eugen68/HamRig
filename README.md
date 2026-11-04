@@ -6,7 +6,7 @@ moduri de conectare:
 
 | | Direct (`YaesuCatRig`) | OmniRig (`OmniRigRig`) |
 |---|---|---|
-| Statii | FTX-1 si Yaesu-urile noi (FTDX10, FT-710, FT-991A...) | orice statie stiuta de OmniRig |
+| Statii | Yaesu-urile noi (FTDX10 verificat; FTX-1, FTDX101, FT-710, FT-991A, FT-891) | orice statie stiuta de OmniRig |
 | Folosire simultana cu alte programe | nu (portul COM e al unui singur program) | da (OmniRig detine portul) |
 | Actualizare | instantanee (AI1: statia anunta singura) | citire periodica (250 ms) |
 | Comenzi | frecventa, mod (toate modurile FTX-1), PTT (CAT sau RTS/DTR), manipulare RTS/DTR | frecventa, mod (fara RTTY separat), PTT si manipulare doar RTS/DTR pe portul de manipulare (OmniRig nu face PTT) |
@@ -16,6 +16,27 @@ moduri de conectare:
 - conectarea directa e portata din aplicatia Android Yaesu-FTX1-CAT-Control (`RadioManager`):
   38400 baud, `AI1;`, `FA` pe 9 cifre, codurile de mod `MD0x` ale FTX-1, PTT si FSK pe RTS/DTR pe
   al doilea port USB al statiei (portul se deschide o singura data)
+
+## Statii verificate
+
+| Statie | Direct (CAT Yaesu) | OmniRig | PTT | Manipulare (FSK) |
+|---|---|---|---|---|
+| **FTDX10** | verificat | verificat | verificat (CAT si RTS/DTR) | verificat |
+
+**Compatibile** (aceleasi comenzi CAT ca FTDX10: `FA` pe 9 cifre, `MD0x`, `TX`, `AI1`; cele cu
+USB apar ca doua porturi COM, "Enhanced" pentru CAT si "Standard" pentru PTT/FSK): FTX-1,
+FTDX101D/MP, FT-710, FT-991A, FT-891.
+
+De stiut:
+- **codurile de mod rare difera** intre modele: la FT-991A `MD0E` e C4FM (aici apare ca PSK),
+  FT-891 nu are `E`/`F`. Frecventa, PTT-ul, manipularea si modurile uzuale (LSB, USB, CW, DATA,
+  RTTY) au aceleasi coduri;
+- ce face RTS si ce face DTR (PTT, FSK, CW) se alege **din meniul statiei**, nu din program;
+- viteza CAT trebuie sa fie aceeasi ca in meniul statiei.
+
+**Nu merg direct**: Yaesu mai vechi cu frecventa pe 8 cifre (FT-950, FT-2000, FT-450 - citirea
+merge, schimbarea frecventei nu) si FT-817/857/897 (protocol binar). Pentru ele si pentru alte
+marci: OmniRig.
 
 ## Utilizare
 
