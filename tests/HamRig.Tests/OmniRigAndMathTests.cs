@@ -13,7 +13,6 @@ public class OmniRigTests
         public List<int> CallThreads { get; } = new();
         public void SetFrequency(long hz) { CallThreads.Add(Environment.CurrentManagedThreadId); Frequency = hz; }
         public void SetMode(int mode) { CallThreads.Add(Environment.CurrentManagedThreadId); Mode = mode; }
-        public void SetTx(bool transmit) { CallThreads.Add(Environment.CurrentManagedThreadId); Tx = transmit; }
         public bool Disposed { get; private set; }
         public void Dispose() => Disposed = true;
     }
@@ -44,9 +43,11 @@ public class OmniRigTests
 
         rig.SetFrequency(7_040_000);
         rig.SetMode(RigMode.RttyL);                           // OmniRig: DIG-L
-        rig.SetPtt(true);
-        await Wait(() => rig.State.Transmitting);
-        Assert.Equal(RigMode.DataL, rig.State.Mode);
+        await Wait(() => rig.State.Mode == RigMode.DataL);
+        rig.SetPtt(true);                                     // OmniRig nu face PTT (fara pin ales: nimic)
+        await Task.Delay(100);
+        Assert.False(rig.State.Transmitting);
+        Assert.False(omni.Tx);
         Assert.Equal(7_040_000, omni.Frequency);
         Assert.All(omni.CallThreads, t => Assert.Equal(omni.CreatedOnThread, t)); // toate apelurile COM pe acelasi fir
 

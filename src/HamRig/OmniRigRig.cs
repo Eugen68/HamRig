@@ -15,7 +15,6 @@ internal interface IOmniRigApi : IDisposable
     bool Tx { get; }
     void SetFrequency(long hz);
     void SetMode(int mode);
-    void SetTx(bool transmit);
 }
 
 /// <summary>Constantele OmniRig (biblioteca de tipuri OmniRig).</summary>
@@ -105,7 +104,6 @@ internal sealed class OmniRigComApi : IOmniRigApi
     }
 
     public void SetMode(int mode) => _rig.Mode = mode;
-    public void SetTx(bool transmit) => _rig.Tx = transmit ? OmniRigConst.PmTx : OmniRigConst.PmRx;
 
     public void Dispose()
     {
@@ -118,8 +116,8 @@ internal sealed class OmniRigComApi : IOmniRigApi
 /// Statia prin OmniRig (Windows; OmniRig trebuie instalat si configurat pentru statie). OmniRig
 /// detine portul, deci statia poate fi folosita in acelasi timp si de alte programe (logger,
 /// WSJT-X). Toate apelurile COM se fac pe un singur fir dedicat; starea se citeste la
-/// <see cref="RigSettings.OmniRigPollMs"/>. OmniRig stie doar comenzile generice: frecventa, mod
-/// (fara RTTY separat - DIG), PTT.
+/// <see cref="RigSettings.OmniRigPollMs"/>. Prin OmniRig: frecventa si modul (fara RTTY separat -
+/// DIG); PTT-ul si manipularea doar pe pinii portului de manipulare, nu prin OmniRig.
 /// </summary>
 public sealed class OmniRigRig : IRig
 {
@@ -315,10 +313,6 @@ public sealed class OmniRigRig : IRig
         }
         CloseLines();
         if (q == null) return;
-        if (_settings.PttLine.Pin == SerialPin.None && State.Transmitting)
-        {
-            try { q.Add(api => api.SetTx(false)); } catch { }
-        }
         q.CompleteAdding();
         t?.Join(2000);
         Publish(RigState.Disconnected());
@@ -334,20 +328,19 @@ public sealed class OmniRigRig : IRig
         if (OmniRigConst.FromMode(mode) is { } pm) Post(api => { api.SetMode(pm); Read(api); });
     }
 
-    /// <summary>PTT pe pinul portului de manipulare, daca e ales; altfel prin OmniRig.</summary>
+    /// <summary>
+    /// PTT doar pe pinul ales al portului de manipulare (RTS/DTR); OmniRig nu face PTT. Fara pin
+    /// ales nu face nimic.
+    /// </summary>
     public void SetPtt(bool transmit)
     {
         ISerialLine? line;
         lock (_lock) line = _ptt;
-        if (line != null)
-        {
-            SerialLines.SetPin(line, _settings.PttLine.Pin, transmit);
-            _linePtt = transmit;
-            var s = State with { Transmitting = transmit };
-            if (s.Connected) Publish(s);
-            return;
-        }
-        Post(api => { api.SetTx(transmit); Read(api); });
+        if (line == null) return;
+        SerialLines.SetPin(line, _settings.PttLine.Pin, transmit);
+        _linePtt = transmit;
+        var s = State with { Transmitting = transmit };
+        if (s.Connected) Publish(s);
     }
 
     public void Dispose() => Disconnect();

@@ -51,8 +51,8 @@ public sealed class RigSettings
     public bool HasKeying => KeyPin != SerialPin.None && !string.IsNullOrWhiteSpace(KeyPort);
 
     /// <summary>
-    /// Unde se face PTT-ul: portul si pinul, sau (null, None) = prin comanda CAT (Yaesu TX1; /
-    /// OmniRig). La OmniRig pinii portului CAT nu se folosesc (portul e al lui OmniRig).
+    /// Unde se face PTT-ul: portul si pinul, sau (null, None) = fara pin: la conexiunea directa prin
+    /// comanda CAT (TX1;), la OmniRig deloc (OmniRig nu face PTT, iar portul CAT e al lui).
     /// </summary>
     public (string? Port, SerialPin Pin) PttLine
     {

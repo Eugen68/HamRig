@@ -9,7 +9,7 @@ moduri de conectare:
 | Statii | FTX-1 si Yaesu-urile noi (FTDX10, FT-710, FT-991A...) | orice statie stiuta de OmniRig |
 | Folosire simultana cu alte programe | nu (portul COM e al unui singur program) | da (OmniRig detine portul) |
 | Actualizare | instantanee (AI1: statia anunta singura) | citire periodica (250 ms) |
-| Comenzi | frecventa, mod (toate modurile FTX-1), PTT (CAT sau RTS/DTR), manipulare RTS/DTR | frecventa, mod (fara RTTY separat), PTT (OmniRig sau RTS/DTR pe portul de manipulare), manipulare RTS/DTR |
+| Comenzi | frecventa, mod (toate modurile FTX-1), PTT (CAT sau RTS/DTR), manipulare RTS/DTR | frecventa, mod (fara RTTY separat), PTT si manipulare doar RTS/DTR pe portul de manipulare (OmniRig nu face PTT) |
 | Cerinte | nimic in plus | OmniRig instalat si configurat (Windows) |
 
 - tinta: `net8.0`; OmniRig doar pe Windows
@@ -35,7 +35,7 @@ var settings = new RigSettings
     KeyPortPttPin = SerialPin.Rts, // PTT aici sau la CatPttPin, nu in ambele locuri
     KeyPin = SerialPin.Dtr,        // FSK / keying CW: rig.SetKey(true/false)
 };
-// niciun pin de PTT ales = PTT prin comanda CAT (Yaesu TX1; / OmniRig)
+// niciun pin de PTT ales = conexiunea directa: comanda CAT TX1;  OmniRig: fara PTT
 // settings.Validate() spune ce nu e bine (PTT in doua locuri, acelasi pin pentru PTT si manipulare...)
 
 using IRig rig = settings.CreateRig()!;

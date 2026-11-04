@@ -117,7 +117,6 @@ public class KeyingTests
         public bool Tx => false;
         public void SetFrequency(long hz) { }
         public void SetMode(int mode) { }
-        public void SetTx(bool transmit) { }
         public void Dispose() { }
     }
 

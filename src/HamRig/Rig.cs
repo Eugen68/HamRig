@@ -74,7 +74,7 @@ public interface IRig : IDisposable
 
     /// <summary>
     /// Emisie / receptie: pe pinul ales in setari (RTS/DTR la portul CAT sau la portul de
-    /// manipulare), iar daca nu e ales niciun pin, prin comanda CAT (Yaesu TX1; / OmniRig Tx).
+    /// manipulare). Fara pin ales: la conexiunea directa prin comanda CAT (TX1;), la OmniRig deloc.
     /// </summary>
     void SetPtt(bool transmit);
 
