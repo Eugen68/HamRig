@@ -37,6 +37,14 @@ public enum PttMethod
     Dtr,
 }
 
+/// <summary>Pinul unui port serial folosit pentru manipulare (FSK / CW).</summary>
+public enum SerialPin
+{
+    None,
+    Rts,
+    Dtr,
+}
+
 /// <summary>Starea statiei, asa cum a raportat-o ultima data.</summary>
 /// <param name="Connected">Statia raspunde.</param>
 /// <param name="FrequencyHz">Frecventa VFO-ului activ (0 = necunoscuta).</param>
@@ -82,4 +90,13 @@ public interface IRig : IDisposable
 
     /// <summary>Emisie / receptie, cu metoda din setari.</summary>
     void SetPtt(bool transmit);
+
+    /// <summary>Exista port de manipulare configurat (si deschis).</summary>
+    bool CanKey { get; }
+
+    /// <summary>
+    /// Manipularea: pinul ales (RTS/DTR) al portului de manipulare - la RTTY FSK activ = Space (ca la
+    /// FTX-1 / Android), la CW activ = cheie apasata. Temporizarea o face apelantul.
+    /// </summary>
+    void SetKey(bool down);
 }

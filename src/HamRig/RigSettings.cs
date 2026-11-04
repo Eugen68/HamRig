@@ -34,6 +34,37 @@ public sealed class RigSettings
     /// </summary>
     public string? PttPort { get; set; }
 
+    /// <summary>
+    /// Portul de manipulare (FSK pentru RTTY, keying CW). La FTX-1 de obicei al doilea port
+    /// ("Standard"), acelasi ca PTT-ul, pe celalalt pin. Gol = fara manipulare.
+    /// </summary>
+    public string? KeyPort { get; set; }
+
+    /// <summary>Viteza portului de manipulare (conteaza doar la deschidere; liniile RTS/DTR nu depind de ea).</summary>
+    public int KeyBaud { get; set; } = 4800;
+
+    /// <summary>Pinul pe care se manipuleaza.</summary>
+    public SerialPin KeyPin { get; set; } = SerialPin.None;
+
+    /// <summary>Manipularea e configurata (port si pin).</summary>
+    public bool HasKeying => KeyPin != SerialPin.None && !string.IsNullOrWhiteSpace(KeyPort);
+
+    /// <summary>
+    /// O problema a setarilor, sau null: ex. PTT si manipularea pe acelasi pin al aceluiasi port.
+    /// </summary>
+    public string? Validate()
+    {
+        if (Kind == RigKind.YaesuCat && string.IsNullOrWhiteSpace(CatPort)) return "Alege portul CAT.";
+        if (HasKeying && Kind == RigKind.YaesuCat && Ptt is PttMethod.Rts or PttMethod.Dtr)
+        {
+            string pttPort = string.IsNullOrWhiteSpace(PttPort) ? CatPort ?? "" : PttPort!;
+            bool samePin = (Ptt == PttMethod.Rts && KeyPin == SerialPin.Rts) || (Ptt == PttMethod.Dtr && KeyPin == SerialPin.Dtr);
+            if (samePin && string.Equals(pttPort, KeyPort, StringComparison.OrdinalIgnoreCase))
+                return $"PTT si manipularea nu pot fi pe acelasi pin ({KeyPin}) al portului {KeyPort}.";
+        }
+        return null;
+    }
+
     /// <summary>OmniRig: Rig 1 sau Rig 2.</summary>
     public int OmniRigNumber { get; set; } = 1;
 

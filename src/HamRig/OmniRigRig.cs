@@ -125,19 +125,24 @@ public sealed class OmniRigRig : IRig
 {
     private readonly RigSettings _settings;
     private readonly Func<int, IOmniRigApi> _create;
+    private readonly Func<string, int, ISerialLine> _openLine;
     private readonly object _lock = new();
+    private SerialLines? _lines;
+    private ISerialLine? _key;
     private BlockingCollection<Action<IOmniRigApi>>? _queue;
     private Thread? _thread;
     private RigState _state = RigState.Disconnected();
 
-    public OmniRigRig(RigSettings settings) : this(settings, CreateCom)
+    public OmniRigRig(RigSettings settings) : this(settings, CreateCom, (port, baud) => SerialPortLine.Open(port, baud))
     {
     }
 
-    internal OmniRigRig(RigSettings settings, Func<int, IOmniRigApi> create)
+    /// <param name="openLine">Deschiderea portului de manipulare (OmniRig nu face manipulare; pentru teste).</param>
+    internal OmniRigRig(RigSettings settings, Func<int, IOmniRigApi> create, Func<string, int, ISerialLine>? openLine = null)
     {
         _settings = settings.Clone();
         _create = create;
+        _openLine = openLine ?? ((port, baud) => SerialPortLine.Open(port, baud));
     }
 
     private static IOmniRigApi CreateCom(int rig) =>
@@ -152,9 +157,29 @@ public sealed class OmniRigRig : IRig
 
     public event Action<RigState>? StateChanged;
 
-    public Task ConnectAsync(CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         Disconnect();
+        // manipularea nu trece prin OmniRig: portul ei se deschide aici (nu poate fi portul CAT al lui OmniRig)
+        SerialLines? lines = null;
+        if (_settings.HasKeying)
+        {
+            lines = new SerialLines(_openLine);
+            try
+            {
+                var key = lines.Get(_settings.KeyPort!, _settings.KeyBaud);
+                lock (_lock)
+                {
+                    _lines = lines;
+                    _key = key;
+                }
+            }
+            catch (RigException e)
+            {
+                lines.Dispose();
+                throw new RigException("Portul de manipulare: " + e.Message, e);
+            }
+        }
         var started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var queue = new BlockingCollection<Action<IOmniRigApi>>();
         var thread = new Thread(() => Run(queue, started)) { IsBackground = true, Name = "OmniRig" };
@@ -165,7 +190,39 @@ public sealed class OmniRigRig : IRig
             _thread = thread;
         }
         thread.Start();
-        return started.Task.WaitAsync(cancellationToken);
+        try
+        {
+            await started.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            CloseLines();
+            throw;
+        }
+    }
+
+    public bool CanKey
+    {
+        get { lock (_lock) return _key != null; }
+    }
+
+    public void SetKey(bool down)
+    {
+        ISerialLine? key;
+        lock (_lock) key = _key;
+        if (key != null) SerialLines.SetPin(key, _settings.KeyPin, down);
+    }
+
+    private void CloseLines()
+    {
+        SerialLines? lines;
+        lock (_lock)
+        {
+            lines = _lines;
+            _lines = null;
+            _key = null;
+        }
+        lines?.Dispose();
     }
 
     private void Run(BlockingCollection<Action<IOmniRigApi>> queue, TaskCompletionSource<bool> started)
@@ -251,6 +308,7 @@ public sealed class OmniRigRig : IRig
             _queue = null;
             _thread = null;
         }
+        CloseLines();
         if (q == null) return;
         if (_settings.Ptt == PttMethod.Cat && State.Transmitting)
         {

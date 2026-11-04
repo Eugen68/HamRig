@@ -17,7 +17,9 @@ public sealed class YaesuCatRig : IRig
     private readonly object _lock = new();
     private readonly StringBuilder _buffer = new();
     private ISerialLine? _cat;
-    private ISerialLine? _ptt;
+    private SerialLines? _lines;
+    private ISerialLine? _ptt;   // linia pentru PTT pe RTS/DTR (poate fi chiar portul CAT)
+    private ISerialLine? _key;   // linia de manipulare (poate fi acelasi port ca PTT)
     private Timer? _poll;
     private RigState _state = RigState.Disconnected();
     private DateTime _lastAnswer;
@@ -56,21 +58,19 @@ public sealed class YaesuCatRig : IRig
         Disconnect();
         if (string.IsNullOrWhiteSpace(_settings.CatPort)) throw new RigException("Nu e ales portul CAT.");
 
-        var cat = _open(_settings.CatPort!, _settings.CatBaud);
-        ISerialLine? ptt = null;
+        var lines = new SerialLines(_open);
+        ISerialLine cat, ptt, key;
         try
         {
-            if (_settings.Ptt is PttMethod.Rts or PttMethod.Dtr && !string.IsNullOrWhiteSpace(_settings.PttPort)
-                && !string.Equals(_settings.PttPort, _settings.CatPort, StringComparison.OrdinalIgnoreCase))
-            {
-                ptt = _open(_settings.PttPort!, 4800);
-                ptt.Rts = false;
-                ptt.Dtr = false;
-            }
+            cat = lines.Get(_settings.CatPort!, _settings.CatBaud);
+            ptt = _settings.Ptt is PttMethod.Rts or PttMethod.Dtr && !string.IsNullOrWhiteSpace(_settings.PttPort)
+                ? lines.Get(_settings.PttPort!, 4800)
+                : cat;
+            key = _settings.HasKeying ? lines.Get(_settings.KeyPort!, _settings.KeyBaud) : null!;
         }
         catch
         {
-            cat.Dispose();
+            lines.Dispose();
             throw;
         }
 
@@ -78,14 +78,15 @@ public sealed class YaesuCatRig : IRig
         lock (_lock)
         {
             _cat = cat;
+            _lines = lines;
             _ptt = ptt;
+            _key = _settings.HasKeying ? key : null;
             _buffer.Clear();
             _firstAnswer = first;
             _state = new RigState(false, 0, RigMode.Unknown, false, "se conecteaza...");
         }
         cat.TextReceived += OnText;
-        cat.Failed += OnFailed;
-        if (ptt != null) ptt.Failed += OnFailed;
+        foreach (var l in lines.All) l.Failed += OnFailed;
 
         // ca in Android: auto-informare, apoi starea curenta
         cat.Write("AI1;FA;MD0;TX;");
@@ -103,39 +104,48 @@ public sealed class YaesuCatRig : IRig
 
     public void Disconnect()
     {
-        ISerialLine? cat, ptt;
+        ISerialLine? cat;
+        SerialLines? lines;
         lock (_lock)
         {
             cat = _cat;
-            ptt = _ptt;
+            lines = _lines;
             _cat = null;
+            _lines = null;
             _ptt = null;
+            _key = null;
             _firstAnswer?.TrySetResult(false);
             _firstAnswer = null;
         }
         _poll?.Dispose();
         _poll = null;
         _linePtt = false;
-        if (cat == null && ptt == null) return;
+        if (lines == null) return;
+        // emisia si manipularea se opresc intai
         try
         {
-            // emisia se opreste intai
             if (_settings.Ptt == PttMethod.Cat) cat?.Write("TX0;");
-            if (ptt != null) { ptt.Rts = false; ptt.Dtr = false; }
-            else if (cat != null && _settings.Ptt is PttMethod.Rts or PttMethod.Dtr) { cat.Rts = false; cat.Dtr = false; }
         }
         catch
         {
             // portul poate fi deja pierdut
         }
-        if (cat != null)
-        {
-            cat.TextReceived -= OnText;
-            cat.Failed -= OnFailed;
-            cat.Dispose();
-        }
-        ptt?.Dispose();
+        if (cat != null) cat.TextReceived -= OnText;
+        foreach (var l in lines.All) l.Failed -= OnFailed;
+        lines.Dispose();   // RTS/DTR pe 0, apoi inchide
         Publish(RigState.Disconnected());
+    }
+
+    public bool CanKey
+    {
+        get { lock (_lock) return _key != null; }
+    }
+
+    public void SetKey(bool down)
+    {
+        ISerialLine? key;
+        lock (_lock) key = _key;
+        if (key != null) SerialLines.SetPin(key, _settings.KeyPin, down);
     }
 
     public void SetFrequency(long hz) => Send(YaesuCat.SetFrequency(hz) + "FA;");
@@ -152,7 +162,7 @@ public sealed class YaesuCatRig : IRig
             case PttMethod.Rts:
             case PttMethod.Dtr:
                 ISerialLine? line;
-                lock (_lock) line = _ptt ?? _cat;
+                lock (_lock) line = _ptt;
                 if (line == null) return;
                 if (_settings.Ptt == PttMethod.Rts) line.Rts = transmit;
                 else line.Dtr = transmit;
