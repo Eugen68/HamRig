@@ -21,23 +21,7 @@ public enum RigMode
     Psk,
 }
 
-/// <summary>Cum se comuta emisia.</summary>
-public enum PttMethod
-{
-    /// <summary>Fara PTT (doar receptie).</summary>
-    None,
-
-    /// <summary>Comanda CAT (Yaesu: TX1; / TX0;, OmniRig: Tx).</summary>
-    Cat,
-
-    /// <summary>Linia RTS a unui port serial (la FTX-1: al doilea port USB, cel "standard").</summary>
-    Rts,
-
-    /// <summary>Linia DTR a unui port serial.</summary>
-    Dtr,
-}
-
-/// <summary>Pinul unui port serial folosit pentru manipulare (FSK / CW).</summary>
+/// <summary>Un pin al portului serial: pentru PTT sau manipulare (FSK / CW).</summary>
 public enum SerialPin
 {
     None,
@@ -88,7 +72,10 @@ public interface IRig : IDisposable
 
     void SetMode(RigMode mode);
 
-    /// <summary>Emisie / receptie, cu metoda din setari.</summary>
+    /// <summary>
+    /// Emisie / receptie: pe pinul ales in setari (RTS/DTR la portul CAT sau la portul de
+    /// manipulare), iar daca nu e ales niciun pin, prin comanda CAT (Yaesu TX1; / OmniRig Tx).
+    /// </summary>
     void SetPtt(bool transmit);
 
     /// <summary>Exista port de manipulare configurat (si deschis).</summary>

@@ -129,6 +129,8 @@ public sealed class OmniRigRig : IRig
     private readonly object _lock = new();
     private SerialLines? _lines;
     private ISerialLine? _key;
+    private ISerialLine? _ptt;   // PTT pe un pin al portului de manipulare (null = prin OmniRig)
+    private volatile bool _linePtt;
     private BlockingCollection<Action<IOmniRigApi>>? _queue;
     private Thread? _thread;
     private RigState _state = RigState.Disconnected();
@@ -162,16 +164,17 @@ public sealed class OmniRigRig : IRig
         Disconnect();
         // manipularea nu trece prin OmniRig: portul ei se deschide aici (nu poate fi portul CAT al lui OmniRig)
         SerialLines? lines = null;
-        if (_settings.HasKeying)
+        if (_settings.NeedsKeyPort)
         {
             lines = new SerialLines(_openLine);
             try
             {
-                var key = lines.Get(_settings.KeyPort!, _settings.KeyBaud);
+                var port = lines.Get(_settings.KeyPort!, _settings.KeyBaud);
                 lock (_lock)
                 {
                     _lines = lines;
-                    _key = key;
+                    _key = _settings.HasKeying ? port : null;
+                    _ptt = _settings.PttLine.Pin != SerialPin.None ? port : null;
                 }
             }
             catch (RigException e)
@@ -221,7 +224,9 @@ public sealed class OmniRigRig : IRig
             lines = _lines;
             _lines = null;
             _key = null;
+            _ptt = null;
         }
+        _linePtt = false;
         lines?.Dispose();
     }
 
@@ -270,7 +275,7 @@ public sealed class OmniRigRig : IRig
             int status = api.Status;
             bool online = status == OmniRigConst.StOnline;
             s = online
-                ? new RigState(true, api.Frequency, OmniRigConst.ToMode(api.Mode), api.Tx, OmniRigConst.StatusName(status))
+                ? new RigState(true, api.Frequency, OmniRigConst.ToMode(api.Mode), _linePtt || api.Tx, OmniRigConst.StatusName(status))
                 : new RigState(false, 0, RigMode.Unknown, false, OmniRigConst.StatusName(status));
         }
         catch (Exception e)
@@ -310,7 +315,7 @@ public sealed class OmniRigRig : IRig
         }
         CloseLines();
         if (q == null) return;
-        if (_settings.Ptt == PttMethod.Cat && State.Transmitting)
+        if (_settings.PttLine.Pin == SerialPin.None && State.Transmitting)
         {
             try { q.Add(api => api.SetTx(false)); } catch { }
         }
@@ -329,10 +334,20 @@ public sealed class OmniRigRig : IRig
         if (OmniRigConst.FromMode(mode) is { } pm) Post(api => { api.SetMode(pm); Read(api); });
     }
 
-    /// <summary>PTT prin OmniRig (doar <see cref="PttMethod.Cat"/>; RTS/DTR le face OmniRig dupa configurarea lui).</summary>
+    /// <summary>PTT pe pinul portului de manipulare, daca e ales; altfel prin OmniRig.</summary>
     public void SetPtt(bool transmit)
     {
-        if (_settings.Ptt != PttMethod.None) Post(api => { api.SetTx(transmit); Read(api); });
+        ISerialLine? line;
+        lock (_lock) line = _ptt;
+        if (line != null)
+        {
+            SerialLines.SetPin(line, _settings.PttLine.Pin, transmit);
+            _linePtt = transmit;
+            var s = State with { Transmitting = transmit };
+            if (s.Connected) Publish(s);
+            return;
+        }
+        Post(api => { api.SetTx(transmit); Read(api); });
     }
 
     public void Dispose() => Disconnect();

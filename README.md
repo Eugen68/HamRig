@@ -9,13 +9,13 @@ moduri de conectare:
 | Statii | FTX-1 si Yaesu-urile noi (FTDX10, FT-710, FT-991A...) | orice statie stiuta de OmniRig |
 | Folosire simultana cu alte programe | nu (portul COM e al unui singur program) | da (OmniRig detine portul) |
 | Actualizare | instantanee (AI1: statia anunta singura) | citire periodica (250 ms) |
-| Comenzi | frecventa, mod (toate modurile FTX-1), PTT CAT/RTS/DTR | frecventa, mod (fara RTTY separat), PTT |
+| Comenzi | frecventa, mod (toate modurile FTX-1), PTT (CAT sau RTS/DTR), manipulare RTS/DTR | frecventa, mod (fara RTTY separat), PTT (OmniRig sau RTS/DTR pe portul de manipulare), manipulare RTS/DTR |
 | Cerinte | nimic in plus | OmniRig instalat si configurat (Windows) |
 
 - tinta: `net8.0`; OmniRig doar pe Windows
 - conectarea directa e portata din aplicatia Android Yaesu-FTX1-CAT-Control (`RadioManager`):
-  38400 baud, `AI1;`, `FA` pe 9 cifre, codurile de mod `MD0x` ale FTX-1, PTT pe RTS/DTR pe al
-  doilea port USB al statiei
+  38400 baud, `AI1;`, `FA` pe 9 cifre, codurile de mod `MD0x` ale FTX-1, PTT si FSK pe RTS/DTR pe
+  al doilea port USB al statiei (portul se deschide o singura data)
 
 ## Utilizare
 
@@ -27,9 +27,16 @@ var settings = new RigSettings
     Kind = RigKind.YaesuCat,       // sau RigKind.OmniRig (+ OmniRigNumber = 1 / 2)
     CatPort = "COM5",              // FTX-1: primul port, "Enhanced COM Port"
     CatBaud = 38400,               // ca in meniul statiei
-    Ptt = PttMethod.Rts,           // None / Cat / Rts / Dtr
-    PttPort = "COM6",              // FTX-1: al doilea port, "Standard COM Port" (gol = portul CAT)
+    CatPttPin = SerialPin.None,    // PTT pe un pin al portului CAT (None / Rts / Dtr)
+
+    // portul de manipulare si PTT - FTX-1: al doilea port, "Standard COM Port"
+    KeyPort = "COM6",
+    KeyBaud = 4800,
+    KeyPortPttPin = SerialPin.Rts, // PTT aici sau la CatPttPin, nu in ambele locuri
+    KeyPin = SerialPin.Dtr,        // FSK / keying CW: rig.SetKey(true/false)
 };
+// niciun pin de PTT ales = PTT prin comanda CAT (Yaesu TX1; / OmniRig)
+// settings.Validate() spune ce nu e bine (PTT in doua locuri, acelasi pin pentru PTT si manipulare...)
 
 using IRig rig = settings.CreateRig()!;
 rig.StateChanged += s => Console.WriteLine($"{RigMath.FormatFrequency(s.FrequencyHz)} {RigMath.ModeName(s.Mode)} {(s.Transmitting ? "TX" : "RX")} - {s.StatusText}");

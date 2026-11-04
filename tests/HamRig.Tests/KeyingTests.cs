@@ -20,8 +20,8 @@ public class KeyingTests
         // ca FTX-1 / Android: al doilea port, PTT pe RTS, FSK pe DTR
         var (rig, ports, opens) = Create(new RigSettings
         {
-            Kind = RigKind.YaesuCat, CatPort = "COM5", Ptt = PttMethod.Rts, PttPort = "COM6",
-            KeyPort = "com6", KeyPin = SerialPin.Dtr,
+            Kind = RigKind.YaesuCat, CatPort = "COM5",
+            KeyPort = "COM6", KeyPortPttPin = SerialPin.Rts, KeyPin = SerialPin.Dtr,
         });
         await rig.ConnectAsync();
         Assert.Equal(1, opens["COM6"]);                       // portul deschis o singura data
@@ -47,7 +47,7 @@ public class KeyingTests
     {
         var (rig, ports, _) = Create(new RigSettings
         {
-            Kind = RigKind.YaesuCat, CatPort = "COM5", Ptt = PttMethod.Cat, KeyPort = "COM7", KeyBaud = 9600, KeyPin = SerialPin.Rts,
+            Kind = RigKind.YaesuCat, CatPort = "COM5", KeyPort = "COM7", KeyBaud = 9600, KeyPin = SerialPin.Rts,
         });
         await rig.ConnectAsync();
         rig.SetKey(true);
@@ -71,11 +71,41 @@ public class KeyingTests
     [Fact]
     public void Validare()
     {
-        Assert.NotNull(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", Ptt = PttMethod.Rts, PttPort = "COM6", KeyPort = "COM6", KeyPin = SerialPin.Rts }.Validate());
-        Assert.NotNull(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", Ptt = PttMethod.Dtr, KeyPort = "COM5", KeyPin = SerialPin.Dtr }.Validate());
-        Assert.Null(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", Ptt = PttMethod.Rts, PttPort = "COM6", KeyPort = "COM6", KeyPin = SerialPin.Dtr }.Validate());
+        // PTT intr-un singur loc
+        Assert.NotNull(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", CatPttPin = SerialPin.Rts, KeyPort = "COM6", KeyPortPttPin = SerialPin.Rts }.Validate());
+        // PTT si manipularea pe acelasi pin
+        Assert.NotNull(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", KeyPort = "COM6", KeyPortPttPin = SerialPin.Dtr, KeyPin = SerialPin.Dtr }.Validate());
+        Assert.NotNull(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", CatPttPin = SerialPin.Dtr, KeyPort = "COM5", KeyPin = SerialPin.Dtr }.Validate());
+        // pin fara port
+        Assert.NotNull(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", KeyPin = SerialPin.Dtr }.Validate());
         Assert.NotNull(new RigSettings { Kind = RigKind.YaesuCat }.Validate());
+        // bune
+        Assert.Null(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", KeyPort = "COM6", KeyPortPttPin = SerialPin.Rts, KeyPin = SerialPin.Dtr }.Validate());
+        Assert.Null(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", CatPttPin = SerialPin.Rts, KeyPort = "COM6", KeyPin = SerialPin.Rts }.Validate());
+        Assert.Null(new RigSettings { Kind = RigKind.OmniRig, CatPttPin = SerialPin.Rts, KeyPort = "COM6", KeyPortPttPin = SerialPin.Rts }.Validate()); // la OmniRig pinul CAT nu conteaza
         Assert.Null(new RigSettings().Validate());
+    }
+
+    [Fact]
+    public void UndeSeFacePtt()
+    {
+        Assert.Equal(("COM5", SerialPin.Dtr), new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", CatPttPin = SerialPin.Dtr }.PttLine);
+        Assert.Equal(("COM6", SerialPin.Rts), new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", KeyPort = "COM6", KeyPortPttPin = SerialPin.Rts }.PttLine);
+        Assert.Equal(((string?)null, SerialPin.None), new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5" }.PttLine);
+        Assert.Equal(((string?)null, SerialPin.None), new RigSettings { Kind = RigKind.OmniRig, CatPort = "COM5", CatPttPin = SerialPin.Rts }.PttLine);
+    }
+
+    [Fact]
+    public async Task PttPePinulPortuluiCat()
+    {
+        var (rig, ports, _) = Create(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", CatPttPin = SerialPin.Dtr });
+        await rig.ConnectAsync();
+        rig.SetPtt(true);
+        Assert.True(ports["COM5"].Dtr);
+        Assert.DoesNotContain("TX1", ports["COM5"].Commands);
+        Assert.True(rig.State.Transmitting);
+        rig.Dispose();
+        Assert.False(ports["COM5"].Dtr);
     }
 
     private sealed class Omni : IOmniRigApi
@@ -95,14 +125,19 @@ public class KeyingTests
     public async Task ManipulareCuOmniRig()
     {
         FakeFtx1? key = null;
-        var rig = new OmniRigRig(new RigSettings { Kind = RigKind.OmniRig, KeyPort = "COM8", KeyPin = SerialPin.Dtr },
+        var rig = new OmniRigRig(new RigSettings { Kind = RigKind.OmniRig, KeyPort = "COM8", KeyPin = SerialPin.Dtr, KeyPortPttPin = SerialPin.Rts, OmniRigPollMs = 20 },
             _ => new Omni(), (port, baud) => key = new FakeFtx1(port));
         await rig.ConnectAsync();
         Assert.True(rig.CanKey);
         rig.SetKey(true);
         Assert.True(key!.Dtr);
+        rig.SetPtt(true);                                     // PTT pe RTS, nu prin OmniRig
+        Assert.True(key.Rts);
+        await Task.Delay(100);                                // citirile periodice nu anuleaza emisia
+        Assert.True(rig.State.Transmitting);
         rig.Dispose();
         Assert.False(key.Dtr);
+        Assert.False(key.Rts);
         Assert.True(key.Disposed);
     }
 

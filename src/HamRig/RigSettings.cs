@@ -26,22 +26,23 @@ public sealed class RigSettings
     /// <summary>Viteza CAT; FTX-1: 38400 (meniul statiei trebuie sa aiba aceeasi valoare).</summary>
     public int CatBaud { get; set; } = 38400;
 
-    public PttMethod Ptt { get; set; } = PttMethod.None;
-
     /// <summary>
-    /// Portul pentru PTT pe RTS/DTR (la FTX-1: "Standard COM Port", al doilea). Gol = acelasi cu
-    /// portul CAT.
+    /// PTT pe un pin al portului CAT (doar la conexiunea directa). Cel mult un loc pentru PTT: fie
+    /// aici, fie <see cref="KeyPortPttPin"/>; niciunul = comanda CAT.
     /// </summary>
-    public string? PttPort { get; set; }
+    public SerialPin CatPttPin { get; set; } = SerialPin.None;
 
     /// <summary>
-    /// Portul de manipulare (FSK pentru RTTY, keying CW). La FTX-1 de obicei al doilea port
-    /// ("Standard"), acelasi ca PTT-ul, pe celalalt pin. Gol = fara manipulare.
+    /// Portul de manipulare si PTT (FSK pentru RTTY, keying CW). La FTX-1 de obicei al doilea port
+    /// ("Standard"): PTT pe un pin, manipularea pe celalalt. Gol = fara.
     /// </summary>
     public string? KeyPort { get; set; }
 
     /// <summary>Viteza portului de manipulare (conteaza doar la deschidere; liniile RTS/DTR nu depind de ea).</summary>
     public int KeyBaud { get; set; } = 4800;
+
+    /// <summary>PTT pe un pin al portului de manipulare (vezi <see cref="CatPttPin"/>).</summary>
+    public SerialPin KeyPortPttPin { get; set; } = SerialPin.None;
 
     /// <summary>Pinul pe care se manipuleaza.</summary>
     public SerialPin KeyPin { get; set; } = SerialPin.None;
@@ -50,18 +51,37 @@ public sealed class RigSettings
     public bool HasKeying => KeyPin != SerialPin.None && !string.IsNullOrWhiteSpace(KeyPort);
 
     /// <summary>
-    /// O problema a setarilor, sau null: ex. PTT si manipularea pe acelasi pin al aceluiasi port.
+    /// Unde se face PTT-ul: portul si pinul, sau (null, None) = prin comanda CAT (Yaesu TX1; /
+    /// OmniRig). La OmniRig pinii portului CAT nu se folosesc (portul e al lui OmniRig).
     /// </summary>
+    public (string? Port, SerialPin Pin) PttLine
+    {
+        get
+        {
+            if (Kind == RigKind.YaesuCat && CatPttPin != SerialPin.None && !string.IsNullOrWhiteSpace(CatPort)) return (CatPort, CatPttPin);
+            if (KeyPortPttPin != SerialPin.None && !string.IsNullOrWhiteSpace(KeyPort)) return (KeyPort, KeyPortPttPin);
+            return (null, SerialPin.None);
+        }
+    }
+
+    /// <summary>Portul de manipulare si PTT trebuie deschis (manipulare sau PTT pe el).</summary>
+    public bool NeedsKeyPort =>
+        !string.IsNullOrWhiteSpace(KeyPort) && (KeyPin != SerialPin.None || KeyPortPttPin != SerialPin.None);
+
+    /// <summary>O problema a setarilor, sau null.</summary>
     public string? Validate()
     {
+        if (Kind == RigKind.None) return null;
         if (Kind == RigKind.YaesuCat && string.IsNullOrWhiteSpace(CatPort)) return "Alege portul CAT.";
-        if (HasKeying && Kind == RigKind.YaesuCat && Ptt is PttMethod.Rts or PttMethod.Dtr)
-        {
-            string pttPort = string.IsNullOrWhiteSpace(PttPort) ? CatPort ?? "" : PttPort!;
-            bool samePin = (Ptt == PttMethod.Rts && KeyPin == SerialPin.Rts) || (Ptt == PttMethod.Dtr && KeyPin == SerialPin.Dtr);
-            if (samePin && string.Equals(pttPort, KeyPort, StringComparison.OrdinalIgnoreCase))
-                return $"PTT si manipularea nu pot fi pe acelasi pin ({KeyPin}) al portului {KeyPort}.";
-        }
+        bool catPtt = Kind == RigKind.YaesuCat && CatPttPin != SerialPin.None;
+        if (catPtt && KeyPortPttPin != SerialPin.None) return "PTT se alege intr-un singur loc: la portul CAT sau la portul de manipulare.";
+        if ((KeyPin != SerialPin.None || KeyPortPttPin != SerialPin.None) && string.IsNullOrWhiteSpace(KeyPort))
+            return "Alege portul de manipulare si PTT.";
+        if (KeyPin != SerialPin.None && KeyPin == KeyPortPttPin)
+            return $"PTT si manipularea nu pot fi pe acelasi pin ({KeyPin}).";
+        if (Kind == RigKind.YaesuCat && KeyPin != SerialPin.None && catPtt && KeyPin == CatPttPin
+            && string.Equals(KeyPort, CatPort, StringComparison.OrdinalIgnoreCase))
+            return $"PTT si manipularea nu pot fi pe acelasi pin ({KeyPin}) al portului {KeyPort}.";
         return null;
     }
 

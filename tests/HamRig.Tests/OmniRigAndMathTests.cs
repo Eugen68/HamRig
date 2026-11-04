@@ -32,7 +32,7 @@ public class OmniRigTests
     public async Task CitireComenziPeFirulOmniRig()
     {
         FakeOmni? omni = null;
-        var rig = new OmniRigRig(new RigSettings { Kind = RigKind.OmniRig, OmniRigNumber = 2, OmniRigPollMs = 50, Ptt = PttMethod.Cat },
+        var rig = new OmniRigRig(new RigSettings { Kind = RigKind.OmniRig, OmniRigNumber = 2, OmniRigPollMs = 50 },
             n => { Assert.Equal(2, n); return omni = new FakeOmni(); });
         await rig.ConnectAsync();
         Assert.True(rig.State.Connected);
@@ -107,10 +107,11 @@ public class RigMathTests
         Assert.Null(new RigSettings().CreateRig());
         Assert.IsType<YaesuCatRig>(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5" }.CreateRig());
         Assert.IsType<OmniRigRig>(new RigSettings { Kind = RigKind.OmniRig }.CreateRig());
-        var json = System.Text.Json.JsonSerializer.Serialize(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", Ptt = PttMethod.Rts, PttPort = "COM6" });
+        var json = System.Text.Json.JsonSerializer.Serialize(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", KeyPort = "COM6", KeyPortPttPin = SerialPin.Rts, KeyPin = SerialPin.Dtr });
         var back = System.Text.Json.JsonSerializer.Deserialize<RigSettings>(json)!;
-        Assert.Equal("COM6", back.PttPort);
-        Assert.Equal(PttMethod.Rts, back.Ptt);
+        Assert.Equal("COM6", back.KeyPort);
+        Assert.Equal(SerialPin.Rts, back.KeyPortPttPin);
+        Assert.Equal(SerialPin.Dtr, back.KeyPin);
         Assert.Equal(38400, back.CatBaud);
     }
 }

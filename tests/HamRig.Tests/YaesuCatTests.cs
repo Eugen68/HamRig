@@ -67,7 +67,7 @@ public class YaesuCatRigTests
     [Fact]
     public async Task ConectareCitireSiComenzi()
     {
-        var (rig, ports) = Create(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", Ptt = PttMethod.Cat });
+        var (rig, ports) = Create(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5" }); // fara pin: PTT prin CAT
         var states = new List<RigState>();
         rig.StateChanged += s => { lock (states) states.Add(s); };
         await rig.ConnectAsync();
@@ -100,7 +100,7 @@ public class YaesuCatRigTests
     [Fact]
     public async Task PttPeRtsAlDoileaPort()
     {
-        var (rig, ports) = Create(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", Ptt = PttMethod.Rts, PttPort = "COM6" });
+        var (rig, ports) = Create(new RigSettings { Kind = RigKind.YaesuCat, CatPort = "COM5", KeyPort = "COM6", KeyPortPttPin = SerialPin.Rts });
         await rig.ConnectAsync();
         rig.SetPtt(true);
         Assert.True(ports["COM6"].Rts);

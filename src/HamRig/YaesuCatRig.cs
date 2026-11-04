@@ -63,10 +63,10 @@ public sealed class YaesuCatRig : IRig
         try
         {
             cat = lines.Get(_settings.CatPort!, _settings.CatBaud);
-            ptt = _settings.Ptt is PttMethod.Rts or PttMethod.Dtr && !string.IsNullOrWhiteSpace(_settings.PttPort)
-                ? lines.Get(_settings.PttPort!, 4800)
-                : cat;
-            key = _settings.HasKeying ? lines.Get(_settings.KeyPort!, _settings.KeyBaud) : null!;
+            var keyPort = _settings.NeedsKeyPort ? lines.Get(_settings.KeyPort!, _settings.KeyBaud) : null;
+            key = _settings.HasKeying ? keyPort! : null!;
+            var (pttPort, _) = _settings.PttLine;
+            ptt = pttPort == null ? null! : lines.Find(pttPort)!;
         }
         catch
         {
@@ -79,7 +79,7 @@ public sealed class YaesuCatRig : IRig
         {
             _cat = cat;
             _lines = lines;
-            _ptt = ptt;
+            _ptt = ptt;   // null = PTT prin comanda CAT
             _key = _settings.HasKeying ? key : null;
             _buffer.Clear();
             _firstAnswer = first;
@@ -124,7 +124,7 @@ public sealed class YaesuCatRig : IRig
         // emisia si manipularea se opresc intai
         try
         {
-            if (_settings.Ptt == PttMethod.Cat) cat?.Write("TX0;");
+            if (_settings.PttLine.Pin == SerialPin.None) cat?.Write("TX0;");
         }
         catch
         {
@@ -154,23 +154,19 @@ public sealed class YaesuCatRig : IRig
 
     public void SetPtt(bool transmit)
     {
-        switch (_settings.Ptt)
+        var pin = _settings.PttLine.Pin;
+        ISerialLine? line;
+        lock (_lock) line = _ptt;
+        if (pin == SerialPin.None || line == null)
         {
-            case PttMethod.Cat:
-                Send(YaesuCat.Ptt(transmit) + "TX;");
-                break;
-            case PttMethod.Rts:
-            case PttMethod.Dtr:
-                ISerialLine? line;
-                lock (_lock) line = _ptt;
-                if (line == null) return;
-                if (_settings.Ptt == PttMethod.Rts) line.Rts = transmit;
-                else line.Dtr = transmit;
-                // emisia pe linie nu apare neaparat in raspunsul CAT "TX": o stim noi, cat timp linia e activa
-                _linePtt = transmit;
-                Update(s => s with { Transmitting = transmit });
-                break;
+            // niciun pin ales: comanda CAT
+            Send(YaesuCat.Ptt(transmit) + "TX;");
+            return;
         }
+        SerialLines.SetPin(line, pin, transmit);
+        // emisia pe linie nu apare neaparat in raspunsul CAT "TX": o stim noi, cat timp linia e activa
+        _linePtt = transmit;
+        Update(s => s with { Transmitting = transmit });
     }
 
     private void Send(string commands)
