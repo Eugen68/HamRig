@@ -13,6 +13,9 @@ public enum RigKind
 
     /// <summary>Prin OmniRig (Windows): statia poate fi folosita in acelasi timp si de alte programe.</summary>
     OmniRig,
+
+    /// <summary>Prin Hamlib (rigctld, TCP): sute de modele de statii, si alte programe pot folosi acelasi rigctld.</summary>
+    Hamlib,
 }
 
 /// <summary>Setarile conexiunii (se pot salva direct cu System.Text.Json).</summary>
@@ -73,6 +76,13 @@ public sealed class RigSettings
     {
         if (Kind == RigKind.None) return null;
         if (Kind == RigKind.YaesuCat && string.IsNullOrWhiteSpace(CatPort)) return "Alege portul CAT.";
+        if (Kind == RigKind.Hamlib && HamlibStartDaemon)
+        {
+            if (HamlibModel <= 0) return "Alege modelul statiei (Hamlib).";
+            if (string.IsNullOrWhiteSpace(CatPort) && HamlibModel > 10) return "Alege portul statiei (Hamlib).";
+        }
+        if (Kind == RigKind.Hamlib && (string.IsNullOrWhiteSpace(HamlibHost) || HamlibPort is <= 0 or > 65535))
+            return "Adresa sau portul rigctld nu sunt valide.";
         bool catPtt = Kind == RigKind.YaesuCat && CatPttPin != SerialPin.None;
         if (catPtt && KeyPortPttPin != SerialPin.None) return "PTT se alege intr-un singur loc: la portul CAT sau la portul de manipulare.";
         if ((KeyPin != SerialPin.None || KeyPortPttPin != SerialPin.None) && string.IsNullOrWhiteSpace(KeyPort))
@@ -88,6 +98,30 @@ public sealed class RigSettings
     /// <summary>OmniRig: Rig 1 sau Rig 2.</summary>
     public int OmniRigNumber { get; set; } = 1;
 
+    /// <summary>Hamlib: numarul modelului de statie (din <c>rigctl -l</c>, de ex. 1035 = Yaesu FT-991).</summary>
+    public int HamlibModel { get; set; }
+
+    /// <summary>
+    /// Hamlib: programul porneste singur rigctld (cu modelul, <see cref="CatPort"/> si <see cref="CatBaud"/>)
+    /// si il opreste la deconectare. Nebifat: se leaga la un rigctld deja pornit.
+    /// </summary>
+    public bool HamlibStartDaemon { get; set; } = true;
+
+    /// <summary>Hamlib: calea catre rigctld.exe (gol = cautat in PATH si in Program Files\hamlib*).</summary>
+    public string? HamlibPath { get; set; }
+
+    /// <summary>Hamlib: adresa lui rigctld.</summary>
+    public string HamlibHost { get; set; } = "127.0.0.1";
+
+    /// <summary>Hamlib: portul TCP al lui rigctld (implicit 4532).</summary>
+    public int HamlibPort { get; set; } = Hamlib.DefaultPort;
+
+    /// <summary>Hamlib: argumente suplimentare pentru rigctld (de ex. <c>--set-conf=...</c>).</summary>
+    public string? HamlibExtraArgs { get; set; }
+
+    /// <summary>Hamlib: citirea starii la atatea ms.</summary>
+    public int HamlibPollMs { get; set; } = 250;
+
     /// <summary>OmniRig: citirea starii la atatea ms.</summary>
     public int OmniRigPollMs { get; set; } = 250;
 
@@ -101,6 +135,7 @@ public sealed class RigSettings
     {
         RigKind.YaesuCat => new YaesuCatRig(this),
         RigKind.OmniRig => new OmniRigRig(this),
+        RigKind.Hamlib => new HamlibRig(this),
         _ => null,
     };
 
