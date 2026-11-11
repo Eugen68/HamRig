@@ -26,8 +26,12 @@ probleme de licenta (Hamlib e GPL/LGPL, HamRig e MIT).
   `Program Files\hamlib*\bin`. Instalarea pe Windows: arhiva sau installer-ul din
   [Hamlib releases](https://github.com/Hamlib/Hamlib/releases).
 - `HamlibStartDaemon = false`: legatura la un `rigctld` deja pornit (`HamlibHost`, `HamlibPort`).
-- `Hamlib.ListModels(rigctldPath)` intoarce lista modelelor (`rigctl -l`); de ex. 1042 = FTDX-10,
-  1049 = FT-710, 1035 = FT-991, 3073 = IC-7300 (Hamlib 4.5.5; FTX-1 doar in versiunile mai noi).
+- `Hamlib.ListModels(rigctldPath)` intoarce lista modelelor (`rigctl -l`); de ex. **1051 = FTX-1**
+  (din Hamlib 4.7), 1042 = FTDX-10, 1049 = FT-710, 1035 = FT-991, 3073 = IC-7300.
+- **Versiunea recomandata: Hamlib 4.7.2 sau mai noua** (`Hamlib.RecommendedVersion`): are doua corecturi
+  de securitate in rigctld (CVE-2026-54634, GHSA-f72v-7gmh-m9mj) si corecturi pentru FTX-1.
+  `Hamlib.GetVersion(rigctldPath)` citeste versiunea (`rigctld --version`). rigctld pornit de HamRig
+  asculta doar pe `127.0.0.1` (`-T`), nu in retea.
 - Modurile: `RTTY` = RTTY-L, `RTTYR` = RTTY-U, `PKTUSB`/`PKTLSB` = DATA-U/L.
 - Doar frecventa e obligatorie: multe statii nu raporteaza PTT-ul sau modul (Hamlib raspunde `RPRT -11`);
   atunci nu se mai cer. O comanda refuzata (de ex. un mod pe care statia nu-l are) nu rupe legatura.

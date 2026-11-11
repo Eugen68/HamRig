@@ -153,6 +153,38 @@ public static class Hamlib
     public const int DefaultPort = 4532;
 
     /// <summary>
+    /// Versiunea recomandata: 4.7.2 are doua corecturi de securitate in rigctld (CVE-2026-54634,
+    /// GHSA-f72v-7gmh-m9mj) si corecturi pentru FTX-1 (model 1051, din Hamlib 4.7).
+    /// </summary>
+    public static readonly Version RecommendedVersion = new(4, 7, 2);
+
+    /// <summary>Versiunea Hamlib din textul lui <c>rigctld --version</c> ("rigctld Hamlib 4.5.5 ..."), sau null.</summary>
+    public static Version? ParseVersion(string text)
+    {
+        var m = Regex.Match(text, @"Hamlib\s+(\d+)\.(\d+)(?:\.(\d+))?");
+        if (!m.Success) return null;
+        int Part(int i) => m.Groups[i].Success ? int.Parse(m.Groups[i].Value, CultureInfo.InvariantCulture) : 0;
+        return new Version(Part(1), Part(2), Part(3));
+    }
+
+    /// <summary>Versiunea lui rigctld (<c>rigctld --version</c>), sau null daca nu se poate afla.</summary>
+    public static Version? GetVersion(string rigctldPath)
+    {
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo(rigctldPath, "--version")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true,
+            });
+            if (p == null) return null;
+            string text = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
+            p.WaitForExit(5000);
+            return ParseVersion(text);
+        }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>
     /// rigctld.exe: in PATH sau intr-un folder Hamlib din Program Files (instalarea oficiala pune
     /// <c>hamlib-w64-4.x\bin</c>). Null daca nu se gaseste.
     /// </summary>

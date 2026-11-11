@@ -248,6 +248,17 @@ public class HamlibTests
     }
 
     [Fact]
+    public void VersiuneaHamlib()
+    {
+        Assert.Equal(new Version(4, 5, 5), Hamlib.ParseVersion("rigctl Hamlib 4.5.5 Apr 05 11:43:08Z 2023 SHA=6eecd3"));
+        Assert.Equal(new Version(4, 7, 2), Hamlib.ParseVersion("rigctld Hamlib 4.7.2 2026-06-21"));
+        Assert.Equal(new Version(4, 7, 0), Hamlib.ParseVersion("rigctld Hamlib 4.7~git"));
+        Assert.Null(Hamlib.ParseVersion("altceva"));
+        Assert.True(Hamlib.ParseVersion("rigctld Hamlib 4.5.5") < Hamlib.RecommendedVersion);
+        Assert.False(Hamlib.ParseVersion("rigctld Hamlib 4.7.2") < Hamlib.RecommendedVersion);
+    }
+
+    [Fact]
     public void ArgumenteleLuiRigctld()
     {
         var s = new RigSettings { Kind = RigKind.Hamlib, HamlibModel = 1042, CatPort = "COM5", CatBaud = 38400, HamlibPort = 4533, HamlibExtraArgs = "--set-conf=serial_handshake=None" };
