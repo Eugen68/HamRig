@@ -89,9 +89,12 @@ internal sealed class RigctlConnection : IDisposable
         _writer = new StreamWriter(stream, Encoding.ASCII) { NewLine = "\n", AutoFlush = true };
     }
 
-    public static async Task<RigctlConnection> OpenAsync(string host, int port, int timeoutMs, CancellationToken cancellationToken)
+    /// <param name="timeoutMs">Limita legaturii TCP.</param>
+    /// <param name="replyTimeoutMs">Limita unui raspuns: rigctld reincearca singur statia (la Icom pana la cateva secunde).</param>
+    public static async Task<RigctlConnection> OpenAsync(string host, int port, int timeoutMs, CancellationToken cancellationToken, int replyTimeoutMs = 0)
     {
-        var client = new TcpClient { NoDelay = true, ReceiveTimeout = timeoutMs, SendTimeout = timeoutMs };
+        int reply = Math.Max(timeoutMs, replyTimeoutMs);
+        var client = new TcpClient { NoDelay = true, ReceiveTimeout = reply, SendTimeout = reply };
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -126,6 +129,10 @@ internal sealed class RigctlConnection : IDisposable
                 }
                 lines.Add(line);
             }
+        }
+        catch (IOException e) when (e.InnerException is SocketException { SocketErrorCode: SocketError.TimedOut })
+        {
+            throw new RigException($"Statia nu raspunde: rigctld nu a primit raspuns de la statie in {_client.ReceiveTimeout / 1000.0:0.#} s.", e);
         }
         catch (IOException e)
         {
@@ -320,6 +327,11 @@ public sealed class HamlibRig : IRig
             var connection = await ConnectWithRetryAsync(cancellationToken).ConfigureAwait(false);
             RigState first;
             try { first = Read(connection); }
+            catch (RigException e)
+            {
+                connection.Dispose();
+                throw new RigException(e.Message + FirstReadHint(), e);
+            }
             catch { connection.Dispose(); throw; }
             var queue = new System.Collections.Concurrent.BlockingCollection<Action<RigctlConnection>>();
             var thread = new Thread(() => Run(connection, queue)) { IsBackground = true, Name = "Hamlib" };
@@ -335,6 +347,9 @@ public sealed class HamlibRig : IRig
         }
     }
 
+    /// <summary>Asteptarea unui raspuns: rigctld reincearca singur o statie tacuta (Icom: ~3 x 1 s), apoi raspunde cu eroare.</summary>
+    public const int ReplyTimeoutMs = 6000;
+
     /// <summary>rigctld pornit de noi asculta abia dupa ce deschide statia: se reincearca cateva secunde.</summary>
     private async Task<RigctlConnection> ConnectWithRetryAsync(CancellationToken cancellationToken)
     {
@@ -344,7 +359,7 @@ public sealed class HamlibRig : IRig
         {
             try
             {
-                return await RigctlConnection.OpenAsync(_settings.HamlibHost, _settings.HamlibPort, timeout, cancellationToken).ConfigureAwait(false);
+                return await RigctlConnection.OpenAsync(_settings.HamlibHost, _settings.HamlibPort, timeout, cancellationToken, ReplyTimeoutMs).ConfigureAwait(false);
             }
             catch (RigException) when (DateTime.UtcNow < limit && DaemonAlive())
             {
@@ -355,6 +370,17 @@ public sealed class HamlibRig : IRig
                 throw new RigException($"rigctld s-a oprit (cod {d.ExitCode}): {DaemonError()}", e);
             }
         }
+    }
+
+    /// <summary>Prima citire a esuat: ce e de verificat (statia nu raspunde aproape mereu din port/viteza/adresa).</summary>
+    private string FirstReadHint()
+    {
+        string hint = _settings.HamlibStartDaemon
+            ? $" Verifica: portul {_settings.CatPort} (portul CAT al statiei; la statiile cu doua porturi USB de obicei primul), viteza {_settings.CatBaud} = viteza CAT/CI-V din meniul statiei, modelul {_settings.HamlibModel}, adresa CI-V (Icom) si ca statia e pornita."
+            : " Verifica rigctld-ul pornit separat (modelul, portul si viteza lui).";
+        string log;
+        lock (_daemonLog) log = _daemonLog.Count > 0 ? " rigctld: " + string.Join(" ", _daemonLog) : "";
+        return hint + log;
     }
 
     private bool DaemonAlive()

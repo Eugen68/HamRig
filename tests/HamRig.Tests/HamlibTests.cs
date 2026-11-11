@@ -275,3 +275,24 @@ public class HamlibTests
         Assert.Null(new RigSettings { Kind = RigKind.Hamlib, HamlibStartDaemon = false }.Validate());   // rigctld deja pornit
     }
 }
+
+public class HamlibTimeoutTests
+{
+    [Fact]
+    public async Task Silent_rig_reports_no_answer()
+    {
+        // rigctld accepta legatura, dar statia nu raspunde (port/viteza/adresa gresite)
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            var accept = listener.AcceptTcpClientAsync();
+            using var c = await RigctlConnection.OpenAsync("127.0.0.1", port, 300, CancellationToken.None);
+            using var server = await accept;
+            var e = Assert.Throws<RigException>(() => c.Command("f"));
+            Assert.StartsWith("Statia nu raspunde", e.Message);
+        }
+        finally { listener.Stop(); }
+    }
+}
