@@ -296,3 +296,17 @@ public class HamlibTimeoutTests
         finally { listener.Stop(); }
     }
 }
+
+public class FskPolarityTests
+{
+    [Theory]
+    [InlineData("3073 · Icom IC-7300", true)]
+    [InlineData("Icom IC-7300MK2", true)]
+    [InlineData("1042 · Yaesu FTDX-10", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void Icom_defaults_to_inverted(string? model, bool inverted)
+    {
+        Assert.Equal(inverted, RigSettings.DefaultInvertFsk(model));
+    }
+}

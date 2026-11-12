@@ -50,6 +50,17 @@ public sealed class RigSettings
     /// <summary>Pinul pe care se manipuleaza.</summary>
     public SerialPin KeyPin { get; set; } = SerialPin.None;
 
+    /// <summary>
+    /// Polaritatea pinului FSK: false = pin activ = Mark (Yaesu FTDX10 / FTX-1, testat), true = pin
+    /// activ = Space (Icom pe setarile din fabrica, de ex. IC-7300MK2 - testat). HamRig nu inverseaza
+    /// singur pinul: emitatorul RTTY citeste setarea si comanda <c>SetKey</c> in consecinta.
+    /// </summary>
+    public bool InvertFsk { get; set; }
+
+    /// <summary>Polaritatea FSK obisnuita pentru un model din lista Hamlib: Icom = inversat.</summary>
+    public static bool DefaultInvertFsk(string? modelName) =>
+        modelName != null && modelName.Contains("Icom", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Manipularea e configurata (port si pin).</summary>
     public bool HasKeying => KeyPin != SerialPin.None && !string.IsNullOrWhiteSpace(KeyPort);
 
